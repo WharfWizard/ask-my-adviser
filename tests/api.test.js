@@ -37,7 +37,7 @@ let lastRequest = null
 globalThis.fetch = async (url, init) => {
   lastRequest = { url, body: JSON.parse(init.body), headers: init.headers }
   const tool = lastRequest.body.tool_choice.name
-  return { ok: true, status: 200, json: async () => ({ stop_reason: 'tool_use', content: [{ type: 'tool_use', name: tool, input: { ok: true } }] }) }
+  return { ok: true, status: 200, text: async () => JSON.stringify({ stop_reason: 'tool_use', content: [{ type: 'tool_use', name: tool, input: { ok: true } }] }) }
 }
 
 test('verify accepts a genuine member pass', async () => {

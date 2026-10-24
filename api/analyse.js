@@ -38,19 +38,27 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'x-api-key': process.env.ANTHROPIC_API_KEY.trim(),
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify(request),
       signal: AbortSignal.timeout(280000),
     })
-    const data = await response.json()
+    const raw = await response.text()
+    let data = {}
+    try { data = JSON.parse(raw) } catch { data = { error: { type: 'non_json_response', message: raw.slice(0, 200) } } }
     if (!response.ok) {
-      console.error('Claude API error', response.status, data?.error?.type, data?.error?.message)
-      const busy = response.status === 429 || response.status === 529
-      return res.status(busy ? 503 : 502).json({
-        error: busy ? 'The analysis service is busy. Please wait a minute and try again.' : 'The analysis could not be completed. Please try again.',
-      })
+      const type = data?.error?.type || 'unknown'
+      const message = String(data?.error?.message || '').slice(0, 300)
+      console.error('Claude API error', response.status, type, message)
+      // The API's own explanation never contains the key or the documents, so it is safe to show.
+      const detail = `Claude API ${response.status} ${type}${message ? `: ${message}` : ''}`
+      let error = 'The analysis could not be completed. Please try again.'
+      if (response.status === 429 || response.status === 529) error = 'The analysis service is busy. Please wait a minute and try again.'
+      else if (response.status === 401 || response.status === 403) error = 'The analysis service is not set up correctly (the Claude API key was refused).'
+      else if (/credit balance/i.test(message)) error = 'The analysis service is temporarily unavailable (the Claude account needs topping up).'
+      else if (response.status === 404 || /model/i.test(message)) error = 'The analysis service is not set up correctly (the Claude model was not found).'
+      return res.status(response.status === 429 || response.status === 529 ? 503 : 502).json({ error, detail })
     }
     const { result, truncated } = extractToolResult(data)
     // Nothing from the documents or the result is logged or stored.
@@ -60,6 +68,7 @@ export default async function handler(req, res) {
     const timeout = err?.name === 'TimeoutError'
     return res.status(504).json({
       error: timeout ? 'The analysis took too long. Try fewer or shorter documents.' : 'The analysis could not be completed. Please try again.',
+      detail: `${err?.name || 'Error'}: ${String(err?.message || '').slice(0, 200)}`,
     })
   }
 }

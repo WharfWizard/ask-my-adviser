@@ -121,7 +121,7 @@ export default function App() {
       setSignInMessage('Your membership pass needs renewing. Print or save anything you need first — continuing to My Life Record will clear this page.')
     }
     if (r.status === 413) throw new Error('The documents are too large to send together. Please remove some and work in smaller batches.')
-    if (!r.ok) throw new Error(data.error || 'Something went wrong. Please try again.')
+    if (!r.ok) throw new Error((data.error || 'Something went wrong. Please try again.') + (data.detail ? `\n\nTechnical detail: ${data.detail}` : ''))
     return data
   }
 
@@ -609,7 +609,7 @@ function Loading({ children }) {
 function ErrorBox({ error, retry }) {
   return (
     <div className="note bad" role="alert">
-      <p>{error}</p>
+      <p style={{ whiteSpace: 'pre-wrap' }}>{error}</p>
       {retry && <button className="btn small" onClick={retry}>Try again</button>}
     </div>
   )

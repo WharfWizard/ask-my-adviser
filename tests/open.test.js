@@ -12,7 +12,7 @@ let calls = 0
 globalThis.fetch = async (url, init) => {
   calls++
   const tool = JSON.parse(init.body).tool_choice.name
-  return { ok: true, status: 200, json: async () => ({ stop_reason: 'tool_use', content: [{ type: 'tool_use', name: tool, input: { ok: true } }] }) }
+  return { ok: true, status: 200, text: async () => JSON.stringify({ stop_reason: 'tool_use', content: [{ type: 'tool_use', name: tool, input: { ok: true } }] }) }
 }
 function mockRes() {
   const res = { statusCode: 200, headers: {}, body: null }
@@ -46,4 +46,15 @@ test('limits each visitor per day, separately', async () => {
   const other = mockRes()
   await analyse({ method: 'POST', headers: from('192.0.2.44'), body: { action: 'inventory', documents: docs } }, other)
   assert.equal(other.statusCode, 200)
+})
+
+test('passes the Claude API reason back when it fails', async () => {
+  const saved = globalThis.fetch
+  globalThis.fetch = async () => ({ ok: false, status: 404, text: async () => JSON.stringify({ type: 'error', error: { type: 'not_found_error', message: 'model: claude-sonnet-5-5' } }) })
+  const res = mockRes()
+  await analyse({ method: 'POST', headers: from('203.0.113.99'), body: { action: 'inventory', documents: docs } }, res)
+  globalThis.fetch = saved
+  assert.equal(res.statusCode, 502)
+  assert.match(res.body.error, /model was not found/)
+  assert.match(res.body.detail, /404 not_found_error: model: claude-sonnet-5-5/)
 })
