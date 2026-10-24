@@ -29,6 +29,7 @@ Education and scrutiny only — not financial advice.
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Yes | Claude API key |
 | `CLAUDE_MODEL` | Optional | Defaults to `claude-sonnet-5-5` |
+| `CLAUDE_EFFORT` | Optional | How much Claude thinks before answering: `low`, `medium` (default), `high`. Higher is slower and costs more |
 | `DAILY_ANALYSIS_LIMIT` | Optional | Soft daily limit per visitor (or per member when membership is on), default 30. A full review is about five analyses |
 | `REQUIRE_MEMBERSHIP` + `VITE_REQUIRE_MEMBERSHIP` | Later | Both `true` to require Academy OS membership (see below). Off at launch |
 | `MLR_JWKS_URL` | Optional | Defaults to `https://myliferecord.app/.well-known/jwks.json` |

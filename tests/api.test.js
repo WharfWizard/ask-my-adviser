@@ -82,7 +82,9 @@ test('analyse builds a fixed, structured request for a member', async () => {
   assert.deepEqual(res.body.result, { ok: true })
   const b = lastRequest.body
   assert.equal(b.model, 'claude-sonnet-5-5')
-  assert.equal(b.max_tokens, 8000)
+  assert.equal(b.max_tokens, 32000)
+  assert.equal(b.output_config.effort, 'medium')
+  assert.equal(b.temperature, undefined)
   assert.equal(b.tool_choice, undefined)
   assert.equal(b.tools, undefined)
   assert.equal(b.output_config.format.type, 'json_schema')

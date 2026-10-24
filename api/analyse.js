@@ -2,7 +2,10 @@ import { buildRequest, extractResult, InputError } from '../lib/server/prompts.j
 import { checkPass, readPass, withinDailyLimit, membershipOpen, visitorKey } from '../lib/server/membership.js'
 
 const MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-5-5'
-const MAX_TOKENS = { inventory: 3000, topic: 8000, agenda: 4000, followup: 5000 }
+// Sonnet 5.5 thinks before answering, and thinking counts against max_tokens,
+// so these allow room for both. Effort steers how much it thinks.
+const MAX_TOKENS = { inventory: 16000, topic: 32000, agenda: 16000, followup: 16000 }
+const EFFORT = ['low', 'medium', 'high', 'xhigh', 'max'].includes(process.env.CLAUDE_EFFORT) ? process.env.CLAUDE_EFFORT : 'medium'
 
 export const config = { maxDuration: 300 }
 
@@ -27,7 +30,7 @@ export default async function handler(req, res) {
 
   let request
   try {
-    request = buildRequest(body, { model: MODEL, maxTokens: MAX_TOKENS[body?.action] || 4000 })
+    request = buildRequest(body, { model: MODEL, maxTokens: MAX_TOKENS[body?.action] || 16000, effort: EFFORT })
   } catch (err) {
     if (err instanceof InputError) return res.status(400).json({ error: err.message })
     throw err
