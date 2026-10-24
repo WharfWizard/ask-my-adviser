@@ -26,10 +26,14 @@ const DOC_TYPES = [
 let uid = 0
 const newId = () => `d${Date.now().toString(36)}${(uid++).toString(36)}`
 
+// Membership is off for launch (Ask My Adviser is open as a prospecting tool).
+// Set VITE_REQUIRE_MEMBERSHIP=true (and REQUIRE_MEMBERSHIP=true) to turn on the My Life Record pass.
+const GATED = import.meta.env.VITE_REQUIRE_MEMBERSHIP === 'true'
+
 export default function App() {
   const [pass, setPass] = useState(null)
-  const [signedIn, setSignedIn] = useState(false)
-  const [checking, setChecking] = useState(true)
+  const [signedIn, setSignedIn] = useState(!GATED)
+  const [checking, setChecking] = useState(GATED)
   const [signInMessage, setSignInMessage] = useState('')
 
   const [step, setStep] = useState(0)
@@ -47,6 +51,7 @@ export default function App() {
 
   // On load: receive a pass returning from My Life Record, or re-check the one we hold
   useEffect(() => {
+    if (!GATED) return
     const received = receivePass()
     if (received?.error) {
       setSignInMessage(received.error)
@@ -55,8 +60,7 @@ export default function App() {
     }
     const candidate = received?.pass || storedPass.get()
     if (!candidate) {
-      // Local testing with MEMBERSHIP_REQUIRED=false needs no pass
-      verify('').then((r) => { if (r.ok) { setSignedIn(true) } }).finally(() => setChecking(false))
+      setChecking(false)
       return
     }
     verify(candidate).then((r) => {
@@ -112,7 +116,7 @@ export default function App() {
     })
     let data = {}
     try { data = await r.json() } catch { /* non-JSON error page */ }
-    if (r.status === 401) {
+    if (r.status === 401 && GATED) {
       storedPass.clear(); setPass(null); setSignedIn(false)
       setSignInMessage('Your membership pass needs renewing. Print or save anything you need first — continuing to My Life Record will clear this page.')
     }
@@ -227,10 +231,11 @@ export default function App() {
               <span className="brand-sub">Academy of Life Planning</span>
             </span>
           </a>
-          {signedIn && (
+          {signedIn && (docs.length > 0 || GATED) && (
             <span className="no-print top-links">
-              {docs.length > 0 && <><button className="link-btn" onClick={startAgain}>Start again</button>&nbsp;&nbsp;·&nbsp;&nbsp;</>}
-              <button className="link-btn" onClick={signOut}>Sign out</button>
+              {docs.length > 0 && <button className="link-btn" onClick={startAgain}>Start again</button>}
+              {docs.length > 0 && GATED && <>&nbsp;&nbsp;·&nbsp;&nbsp;</>}
+              {GATED && <button className="link-btn" onClick={signOut}>Sign out</button>}
             </span>
           )}
         </div>

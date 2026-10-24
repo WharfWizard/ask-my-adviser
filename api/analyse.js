@@ -1,5 +1,5 @@
 import { buildRequest, extractToolResult, InputError } from '../lib/server/prompts.js'
-import { checkPass, readPass, withinDailyLimit } from '../lib/server/membership.js'
+import { checkPass, readPass, withinDailyLimit, membershipOpen, visitorKey } from '../lib/server/membership.js'
 
 const MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-5-5'
 const MAX_TOKENS = { inventory: 3000, topic: 8000, agenda: 4000, followup: 5000 }
@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   if (!pass.ok) {
     return res.status(401).json({ error: 'Please sign in again through My Life Record.', code: pass.reason })
   }
-  if (!withinDailyLimit(pass.member)) {
+  if (!withinDailyLimit(membershipOpen() ? visitorKey(req) : pass.member)) {
     return res.status(429).json({ error: "You've reached today's limit for analyses. Please come back tomorrow." })
   }
 

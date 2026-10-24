@@ -7,7 +7,7 @@ const { publicKey, privateKey } = await generateKeyPair('EdDSA', { crv: 'Ed25519
 const jwk = { ...(await exportJWK(publicKey)), kid: 'mlr-pass-v1', use: 'sig', alg: 'EdDSA' }
 process.env.MLR_JWKS = JSON.stringify({ keys: [jwk] })
 process.env.ANTHROPIC_API_KEY = 'test-key'
-delete process.env.MEMBERSHIP_REQUIRED
+process.env.REQUIRE_MEMBERSHIP = 'true' // these tests cover the switched-on mode
 
 const other = await generateKeyPair('EdDSA', { crv: 'Ed25519' })
 

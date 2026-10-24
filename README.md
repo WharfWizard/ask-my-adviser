@@ -1,6 +1,6 @@
 # Ask My Adviser
 
-A members' tool from the **Academy of Life Planning**, built on the guide *Top Ten AI Prompts to Use on Your Financial Adviser* (Steve Conley, 24 October 2026).
+A free public tool from the **Academy of Life Planning**, built on the guide *Top Ten AI Prompts to Use on Your Financial Adviser* (Steve Conley, 24 October 2026).
 
 **Understand what you pay. Test what you receive. Decide what you need.**
 
@@ -29,18 +29,21 @@ Education and scrutiny only — not financial advice.
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Yes | Claude API key |
 | `CLAUDE_MODEL` | Optional | Defaults to `claude-sonnet-5-5` |
-| `DAILY_ANALYSIS_LIMIT` | Optional | Soft per-member daily limit, default 30 |
+| `DAILY_ANALYSIS_LIMIT` | Optional | Soft daily limit per visitor (or per member when membership is on), default 30. A full review is about five analyses |
+| `REQUIRE_MEMBERSHIP` + `VITE_REQUIRE_MEMBERSHIP` | Later | Both `true` to require Academy OS membership (see below). Off at launch |
 | `MLR_JWKS_URL` | Optional | Defaults to `https://myliferecord.app/.well-known/jwks.json` |
 | `MLR_JWKS` | Optional | My Life Record's key set as inline JSON, instead of fetching it |
 | `VITE_MLR_URL` | Optional | My Life Record's address, defaults to `https://myliferecord.app` |
-| `MEMBERSHIP_REQUIRED` | Testing only | `false` opens the app to anyone. Never set in production |
 
 3. Redeploy after adding variables. Add a custom domain under **Settings → Domains**.
-4. In My Life Record, add this site's address to `ASK_MY_ADVISER_ORIGINS` in `src/app/api/unlock/route.js`. My Life Record will not send passes anywhere else.
 
-## Membership: the My Life Record pass
+## Membership: the My Life Record pass (off at launch)
 
-Ask My Adviser holds no accounts. Membership is confirmed by My Life Record:
+Ask My Adviser launches **open to everyone** as a prospecting tool, with a soft daily limit per visitor. The membership gate is built and tested but switched off.
+
+To switch it on: merge My Life Record's `ask-my-adviser-unlock` branch (it allows `ask-my-adviser.app` and `www.ask-my-adviser.app`), set `REQUIRE_MEMBERSHIP=true` and `VITE_REQUIRE_MEMBERSHIP=true` in Vercel, and redeploy. The sign-in screen then appears and every analysis needs a pass.
+
+When on, Ask My Adviser still holds no accounts. Membership is confirmed by My Life Record:
 
 1. **Continue with My Life Record** sends the person to
    `https://myliferecord.app/api/unlock?app=ask-my-adviser&return=<this site>/unlock&state=<random>`.
