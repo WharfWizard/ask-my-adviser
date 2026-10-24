@@ -374,8 +374,9 @@ function Begin({ onNext }) {
     <div className="narrow">
       <p className="eyebrow">Before you begin</p>
       <h1>A fairer conversation with your adviser</h1>
-      <p className="lead">You do not need to become a financial expert to ask better questions of one.</p>
-      <p>You will add your adviser's documents, tell us a little about what matters to you, choose up to three areas to look at, and finish with a one-page meeting agenda in your own words.</p>
+      <p className="lead"><strong>Better questions. Clearer answers. Decisions you own.</strong></p>
+      <p>You do not need to become a financial expert to ask better questions of one. You will add your adviser's documents, tell us a little about what matters to you, choose up to three areas to look at, and finish with a one-page meeting agenda in your own words.</p>
+      <p className="small muted">Ask My Adviser reviews the evidence you supply. It does not audit your adviser, and missing evidence does not mean missing work: a review, a calculation or a conversation may simply not be in the documents you add.</p>
 
       <div className="card">
         <h3>Useful documents to gather</h3>
@@ -394,9 +395,10 @@ function Begin({ onNext }) {
       <div className="card">
         <h3>How your documents are handled</h3>
         <ul className="clean small">
-          <li>Your files are read <strong>in your own browser</strong>. National Insurance numbers, account and policy numbers, sort codes, card numbers, dates of birth, emails, phone numbers and postcodes are masked automatically, and you can add names to hide.</li>
-          <li>You can check the masked text before anything is sent. Only that text is sent for analysis by Claude, an AI model from Anthropic.</li>
-          <li>Nothing is stored by this app. Your work disappears when you close the tab, so print or save the results as a PDF.</li>
+          <li><strong>Read in your browser.</strong> Your files are opened on your own device. Only their text is sent, never the files.</li>
+          <li><strong>Masked as a precaution.</strong> National Insurance numbers, account and policy numbers, sort codes, card numbers, dates of birth, emails, phone numbers and postcodes are hidden automatically. Masking can miss things, and it does not hide personal context such as family circumstances, health or where you live. Check the text, add names to hide, and remove anything you would rather not share.</li>
+          <li><strong>What this app keeps.</strong> Your documents and results exist only in your browser tab and are gone when you close it, so print or save the results as a PDF. To limit misuse, the app keeps a short-lived daily count of analyses per visitor, using a scrambled form of your internet address.</li>
+          <li><strong>What others may keep.</strong> The masked text is sent to Anthropic's Claude API for analysis, and Anthropic handles it under its own <a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noreferrer">data policies</a>. Our hosting provider, Vercel, keeps standard technical logs that do not include your document text. <a href="/privacy">Privacy details</a></li>
           <li>Upload only what is necessary. Never include passwords or access codes.</li>
         </ul>
       </div>
@@ -405,7 +407,7 @@ function Begin({ onNext }) {
         <h3>Please confirm</h3>
         <label className="check"><input type="checkbox" checked={ok.a} onChange={(e) => setOk({ ...ok, a: e.target.checked })} /><span>I understand this is education to help me ask questions. It is not financial advice and does not decide what I should do.</span></label>
         <label className="check"><input type="checkbox" checked={ok.b} onChange={(e) => setOk({ ...ok, b: e.target.checked })} /><span>I understand AI can make mistakes. I will check important figures and claims, and will not cancel, transfer or surrender anything based only on these results.</span></label>
-        <label className="check"><input type="checkbox" checked={ok.c} onChange={(e) => setOk({ ...ok, c: e.target.checked })} /><span>I will check the masked text and remove anything about other people that is not needed.</span></label>
+        <label className="check"><input type="checkbox" checked={ok.c} onChange={(e) => setOk({ ...ok, c: e.target.checked })} /><span>I will check the masked text for anything the masking missed, and remove personal details, or details about other people, that are not needed.</span></label>
       </div>
 
       <div className="actions">
@@ -859,7 +861,7 @@ function AgendaView({ agenda, setAgenda, retry, onBack, onPrint, onNext }) {
         {editing ? <EditableList items={a.informationStillNeeded} onChange={(v) => set({ informationStillNeeded: v })} placeholder="item" />
           : <ul className="clean">{a.informationStillNeeded.map((g, i) => <li key={i}>{g}</li>)}</ul>}
 
-        <h3>Actions</h3>
+        <h3>Proposed actions to agree</h3>
         <div className="table-wrap">
           <table className="data">
             <thead><tr><th>Action</th><th>Who</th><th>By</th></tr></thead>

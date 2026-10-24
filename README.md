@@ -2,7 +2,7 @@
 
 A free public tool from the **Academy of Life Planning**, built on the guide *Top Ten AI Prompts to Use on Your Financial Adviser* (Steve Conley, 24 October 2026).
 
-**Understand what you pay. Test what you receive. Decide what you need.**
+**Better questions. Clearer answers. Decisions you own.**
 
 People add their adviser's documents, say what matters to them, choose up to three of the guide's fifteen questions, and receive:
 
