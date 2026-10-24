@@ -129,8 +129,9 @@ export default function App() {
     setInventory({ status: 'loading' })
     try {
       const data = await call('inventory')
-      setInventory({ status: 'done', result: data.result })
-      const suggested = (data.result.suggestedTopics || []).map((s) => s.topicId).filter((id) => TOPICS.some((t) => t.id === id))
+      const result = { ...data.result, documents: (data.result.documents || []).map((d) => ({ ...d, readable: String(d.readable || '').toLowerCase() })) }
+      setInventory({ status: 'done', result })
+      const suggested = (result.suggestedTopics || []).map((s) => s.topicId).filter((id) => TOPICS.some((t) => t.id === id))
       setSelected((cur) => (cur.length ? cur : suggested.slice(0, MAX_TOPICS)))
     } catch (e) {
       setInventory({ status: 'error', error: e.message })
@@ -141,7 +142,8 @@ export default function App() {
     setReviews((r) => ({ ...r, [id]: { status: 'loading' } }))
     try {
       const data = await call('topic', { topicId: id })
-      setReviews((r) => ({ ...r, [id]: { status: 'done', result: data.result, truncated: data.truncated } }))
+      const result = { ...data.result, findings: (data.result.findings || []).map((f) => ({ ...f, kind: String(f.kind || '').toLowerCase() })) }
+      setReviews((r) => ({ ...r, [id]: { status: 'done', result, truncated: data.truncated } }))
     } catch (e) {
       setReviews((r) => ({ ...r, [id]: { status: 'error', error: e.message } }))
     }
@@ -188,7 +190,8 @@ export default function App() {
     setFollowup((f) => ({ ...f, response: maskedResponse, status: 'loading', error: null }))
     try {
       const data = await call('followup', { findings: findingsForAgenda(), agenda: agenda.result, adviserResponse: maskedResponse })
-      setFollowup((f) => ({ ...f, status: 'done', result: data.result }))
+      const result = { ...data.result, assessments: (data.result.assessments || []).map((x) => ({ ...x, status: String(x.status || '').toLowerCase() })) }
+      setFollowup((f) => ({ ...f, status: 'done', result }))
     } catch (e) {
       setFollowup((f) => ({ ...f, status: 'error', error: e.message }))
     }

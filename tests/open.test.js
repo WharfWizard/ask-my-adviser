@@ -11,8 +11,7 @@ const { default: analyse } = await import('../api/analyse.js')
 let calls = 0
 globalThis.fetch = async (url, init) => {
   calls++
-  const tool = JSON.parse(init.body).tool_choice.name
-  return { ok: true, status: 200, text: async () => JSON.stringify({ stop_reason: 'tool_use', content: [{ type: 'tool_use', name: tool, input: { ok: true } }] }) }
+  return { ok: true, status: 200, text: async () => JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ ok: true }) }] }) }
 }
 function mockRes() {
   const res = { statusCode: 200, headers: {}, body: null }

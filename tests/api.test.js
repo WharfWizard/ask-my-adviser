@@ -36,8 +36,7 @@ const docs = [{ name: '2025-03-14_review.pdf', label: 'Ongoing review report', d
 let lastRequest = null
 globalThis.fetch = async (url, init) => {
   lastRequest = { url, body: JSON.parse(init.body), headers: init.headers }
-  const tool = lastRequest.body.tool_choice.name
-  return { ok: true, status: 200, text: async () => JSON.stringify({ stop_reason: 'tool_use', content: [{ type: 'tool_use', name: tool, input: { ok: true } }] }) }
+  return { ok: true, status: 200, text: async () => JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ ok: true }) }] }) }
 }
 
 test('verify accepts a genuine member pass', async () => {
@@ -84,7 +83,11 @@ test('analyse builds a fixed, structured request for a member', async () => {
   const b = lastRequest.body
   assert.equal(b.model, 'claude-sonnet-5-5')
   assert.equal(b.max_tokens, 8000)
-  assert.equal(b.tool_choice.name, 'record_topic_review')
+  assert.equal(b.tool_choice, undefined)
+  assert.equal(b.tools, undefined)
+  assert.equal(b.output_config.format.type, 'json_schema')
+  assert.ok(b.output_config.format.schema.properties.questions)
+  assert.doesNotMatch(JSON.stringify(b.messages), /record_\w+ tool/)
   assert.equal(b.messages[0].content[0].cache_control.type, 'ephemeral')
   assert.match(b.messages[0].content[0].text, /Ongoing advice fee 0.75%/)
   assert.match(b.messages[0].content[0].text, /Retire at 62/)
@@ -113,4 +116,38 @@ test('every action builds', async () => {
     await analyse({ method: 'POST', headers: auth(p), body: { action, documents: docs, ...extra } }, res)
     assert.equal(res.statusCode, 200, action)
   }
+})
+
+test('every schema meets the structured-output rules', async () => {
+  const p = await makePass()
+  const bad = []
+  const walk = (node, path) => {
+    if (Array.isArray(node)) return node.forEach((n, i) => walk(n, `${path}[${i}]`))
+    if (!node || typeof node !== 'object') return
+    if (node.type === 'object') {
+      if (node.additionalProperties !== false) bad.push(`${path}: additionalProperties`)
+      const props = Object.keys(node.properties || {})
+      const req = node.required || []
+      for (const k of props) if (!req.includes(k)) bad.push(`${path}.${k}: optional`)
+    }
+    for (const k of ['minimum', 'maximum', 'minLength', 'maxLength', 'maxItems', 'pattern']) if (k in node) bad.push(`${path}: ${k}`)
+    if ('minItems' in node && ![0, 1].includes(node.minItems)) bad.push(`${path}: minItems`)
+    for (const [k, v] of Object.entries(node)) if (k !== 'enum') walk(v, `${path}.${k}`)
+  }
+  for (const [action, extra] of [['inventory', {}], ['topic', { topicId: 3 }], ['agenda', { findings: [] }], ['followup', { adviserResponse: 'x', agenda: {} }]]) {
+    const res = mockRes()
+    await analyse({ method: 'POST', headers: auth(p), body: { action, documents: docs, ...extra } }, res)
+    walk(lastRequest.body.output_config.format.schema, action)
+  }
+  assert.deepEqual(bad, [])
+})
+
+test('reports a truncated or malformed reply clearly', async () => {
+  const saved = globalThis.fetch
+  globalThis.fetch = async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ stop_reason: 'max_tokens', content: [{ type: 'text', text: '{"explanation": "cut of' }] }) })
+  const res = mockRes()
+  await analyse({ method: 'POST', headers: auth(await makePass()), body: { action: 'topic', topicId: 1, documents: docs } }, res)
+  globalThis.fetch = saved
+  assert.equal(res.statusCode, 502)
+  assert.match(res.body.error, /ran too long/)
 })

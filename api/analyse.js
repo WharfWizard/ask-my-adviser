@@ -1,4 +1,4 @@
-import { buildRequest, extractToolResult, InputError } from '../lib/server/prompts.js'
+import { buildRequest, extractResult, InputError } from '../lib/server/prompts.js'
 import { checkPass, readPass, withinDailyLimit, membershipOpen, visitorKey } from '../lib/server/membership.js'
 
 const MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-5-5'
@@ -60,7 +60,12 @@ export default async function handler(req, res) {
       else if (response.status === 404 || /model/i.test(message)) error = 'The analysis service is not set up correctly (the Claude model was not found).'
       return res.status(response.status === 429 || response.status === 529 ? 503 : 502).json({ error, detail })
     }
-    const { result, truncated } = extractToolResult(data)
+    let extracted
+    try { extracted = extractResult(data) } catch (e) {
+      console.error('Unexpected reply', data?.stop_reason)
+      return res.status(502).json({ error: e.message, detail: `stop_reason ${data?.stop_reason || 'none'}` })
+    }
+    const { result, truncated } = extracted
     // Nothing from the documents or the result is logged or stored.
     return res.status(200).json({ result, truncated })
   } catch (err) {
