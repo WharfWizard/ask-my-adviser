@@ -28,37 +28,33 @@ Education and scrutiny only — not financial advice.
 | Variable | Required | Purpose |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Yes | Claude API key |
-| `MEMBER_ACCESS_CODES` | One of these two | Comma-separated member codes, e.g. `AOLP-7Q2K, AOLP-M4ZD` |
-| `MEMBERSHIP_VERIFY_URL` | One of these two | My Life Record endpoint (see below). Takes priority over the code list |
-| `MEMBERSHIP_VERIFY_SECRET` | Optional | Sent as `Authorization: Bearer …` to the verify URL |
 | `CLAUDE_MODEL` | Optional | Defaults to `claude-sonnet-5-5` |
-| `DAILY_ANALYSIS_LIMIT` | Optional | Soft per-code daily limit, default 30 |
+| `DAILY_ANALYSIS_LIMIT` | Optional | Soft per-member daily limit, default 30 |
+| `MLR_JWKS_URL` | Optional | Defaults to `https://myliferecord.app/.well-known/jwks.json` |
+| `MLR_JWKS` | Optional | My Life Record's key set as inline JSON, instead of fetching it |
+| `VITE_MLR_URL` | Optional | My Life Record's address, defaults to `https://myliferecord.app` |
 | `MEMBERSHIP_REQUIRED` | Testing only | `false` opens the app to anyone. Never set in production |
 
-3. Redeploy after adding variables. Add a custom domain under **Settings → Domains** if wanted.
+3. Redeploy after adding variables. Add a custom domain under **Settings → Domains**.
+4. In My Life Record, add this site's address to `ASK_MY_ADVISER_ORIGINS` in `src/app/api/unlock/route.js`. My Life Record will not send passes anywhere else.
 
-If neither membership variable is set, the app refuses all analyses rather than running open.
+## Membership: the My Life Record pass
 
-### Connecting to My Life Record membership
+Ask My Adviser holds no accounts. Membership is confirmed by My Life Record:
 
-When My Life Record can confirm members, set `MEMBERSHIP_VERIFY_URL`. The app will send:
-
-```
-POST <MEMBERSHIP_VERIFY_URL>
-Content-Type: application/json
-Authorization: Bearer <MEMBERSHIP_VERIFY_SECRET>   (if set)
-
-{ "code": "<what the member typed>", "app": "ask-my-adviser" }
-```
-
-and expects `{ "valid": true }` for a current member. Results are cached for 10 minutes per running instance.
+1. **Continue with My Life Record** sends the person to
+   `https://myliferecord.app/api/unlock?app=ask-my-adviser&return=<this site>/unlock&state=<random>`.
+2. My Life Record checks their Google sign-in and Academy OS membership (a membership subscription or a redeemed planner code). If they aren't signed in or aren't a member yet, it handles that and brings them back afterwards.
+3. It redirects to `/unlock?state=<same>#mlr_pass=<pass>`. The pass is a 7-day EdDSA-signed token (`iss` `https://myliferecord.app`, `aud` `ask-my-adviser`, `mbr: true`, and a `sub` that is unique to this app, so apps can't link a person across the ecosystem).
+4. The browser checks `state` matches what it sent, clears the address bar, and keeps the pass for the session (`sessionStorage`). It never sees the person's Google account or My Life Record data.
+5. Every call to `/api/analyse` carries the pass, and the server checks its signature against My Life Record's published key, plus issuer, audience, expiry and `mbr`.
 
 ## Costs and limits
 
 - Each review is several Claude calls: one document check, one per chosen area (up to three), one agenda, and optionally one follow-up. The documents are marked for prompt caching so the later calls in a session reuse them at a lower cost.
 - Up to 25 documents and 250,000 characters of text per session.
 - `api/analyse.js` may run for up to 300 seconds (Vercel's current maximum on Hobby).
-- The daily limit is held in memory, so it resets when Vercel starts a new instance. It slows misuse; it is not a hard cap. A durable limit would need a store such as Vercel KV/Upstash.
+- The daily limit is held in memory, so it resets when Vercel starts a new instance. It slows misuse; it is not a hard cap. A durable limit would need a store such as Upstash.
 
 ## Develop
 

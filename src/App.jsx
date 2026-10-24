@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { TOPICS, MAX_TOPICS, MAX_TOTAL_CHARS, MAX_DOCS, OPENING_LINE, GUIDE_TITLE, GUIDE_DATE } from '../lib/guide.js'
 import { extractFile, guessDate } from './extract.js'
 import { redact, REDACTION_LABELS } from './redact.js'
+import { startUnlock, receivePass, storedPass, myLifeUrl } from './mlr.js'
 
 const STEPS = ['Begin', 'Documents', 'About you', 'Check', 'Review', 'Agenda', 'Follow-up']
 const KIND_LABEL = {
@@ -22,19 +23,14 @@ const DOC_TYPES = [
   'Performance report', 'Risk assessment', 'Email, letter or meeting note', 'Other',
 ]
 
-const store = {
-  get(k) { try { return sessionStorage.getItem(k) } catch { return null } },
-  set(k, v) { try { sessionStorage.setItem(k, v) } catch { /* private mode */ } },
-  del(k) { try { sessionStorage.removeItem(k) } catch { /* ignore */ } },
-}
-
 let uid = 0
 const newId = () => `d${Date.now().toString(36)}${(uid++).toString(36)}`
 
 export default function App() {
-  const [code, setCode] = useState(() => store.get('ama-code') || '')
+  const [pass, setPass] = useState(null)
   const [signedIn, setSignedIn] = useState(false)
-  const [checking, setChecking] = useState(Boolean(store.get('ama-code')))
+  const [checking, setChecking] = useState(true)
+  const [signInMessage, setSignInMessage] = useState('')
 
   const [step, setStep] = useState(0)
   const [reached, setReached] = useState(0)
@@ -49,11 +45,31 @@ export default function App() {
 
   const topRef = useRef(null)
 
-  // Re-check a remembered code on load
+  // On load: receive a pass returning from My Life Record, or re-check the one we hold
   useEffect(() => {
-    const saved = store.get('ama-code')
-    if (!saved) return
-    verify(saved).then((ok) => { setSignedIn(ok); if (!ok) store.del('ama-code') }).finally(() => setChecking(false))
+    const received = receivePass()
+    if (received?.error) {
+      setSignInMessage(received.error)
+      setChecking(false)
+      return
+    }
+    const candidate = received?.pass || storedPass.get()
+    if (!candidate) {
+      // Local testing with MEMBERSHIP_REQUIRED=false needs no pass
+      verify('').then((r) => { if (r.ok) { setSignedIn(true) } }).finally(() => setChecking(false))
+      return
+    }
+    verify(candidate).then((r) => {
+      if (r.ok) {
+        storedPass.set(candidate); setPass(candidate); setSignedIn(true)
+      } else {
+        storedPass.clear()
+        setSignInMessage(r.reason === 'expired'
+          ? 'Your membership pass has expired. Please continue through My Life Record to renew it.'
+          : r.reason === 'network' ? 'We could not check your membership just now. Please try again.'
+          : 'Your membership could not be confirmed. Please continue through My Life Record.')
+      }
+    }).finally(() => setChecking(false))
   }, [])
 
   // Warn before losing work
@@ -78,22 +94,28 @@ export default function App() {
     requestAnimationFrame(() => topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   }
 
-  async function verify(c) {
+  async function verify(p) {
     try {
-      const r = await fetch('/api/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: c }) })
-      return r.ok
-    } catch { return false }
+      const headers = { 'Content-Type': 'application/json' }
+      if (p) headers.Authorization = `Bearer ${p}`
+      const r = await fetch('/api/verify', { method: 'POST', headers })
+      const data = await r.json().catch(() => ({}))
+      return { ok: r.ok, reason: data.reason }
+    } catch { return { ok: false, reason: 'network' } }
   }
 
   async function call(action, extra = {}) {
     const r = await fetch('/api/analyse', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-member-code': code },
+      headers: { 'Content-Type': 'application/json', ...(pass ? { Authorization: `Bearer ${pass}` } : {}) },
       body: JSON.stringify({ action, documents: payloadDocs, context, ...extra }),
     })
     let data = {}
     try { data = await r.json() } catch { /* non-JSON error page */ }
-    if (r.status === 401) { setSignedIn(false); store.del('ama-code') }
+    if (r.status === 401) {
+      storedPass.clear(); setPass(null); setSignedIn(false)
+      setSignInMessage('Your membership pass needs renewing. Print or save anything you need first — continuing to My Life Record will clear this page.')
+    }
     if (r.status === 413) throw new Error('The documents are too large to send together. Please remove some and work in smaller batches.')
     if (!r.ok) throw new Error(data.error || 'Something went wrong. Please try again.')
     return data
@@ -181,9 +203,10 @@ export default function App() {
   }
 
   function signOut() {
-    store.del('ama-code')
+    storedPass.clear()
+    setPass(null)
     setSignedIn(false)
-    setCode('')
+    setSignInMessage('')
   }
 
   function startAgain() {
@@ -217,10 +240,7 @@ export default function App() {
         {checking ? (
           <div className="status"><span className="spinner" /> Checking your membership…</div>
         ) : !signedIn ? (
-          <SignIn
-            onSignedIn={(c) => { store.set('ama-code', c); setCode(c); setSignedIn(true) }}
-            verify={verify}
-          />
+          <SignIn message={signInMessage} hasWork={docs.length > 0} />
         ) : (
           <>
             <Stepper step={step} reached={reached} onGo={go} />
@@ -314,34 +334,26 @@ function Stepper({ step, reached, onGo }) {
   )
 }
 
-function SignIn({ onSignedIn, verify }) {
-  const [value, setValue] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  async function submit(e) {
-    e.preventDefault()
-    setBusy(true); setError('')
-    const ok = await verify(value.trim())
-    setBusy(false)
-    if (ok) onSignedIn(value.trim())
-    else setError("That code wasn't recognised. Please check it, or contact the Academy if you think it should work.")
+function SignIn({ message, hasWork }) {
+  const [going, setGoing] = useState(false)
+  function go() {
+    if (hasWork && !window.confirm('Continuing to My Life Record will clear your documents and results from this page. Continue?')) return
+    setGoing(true)
+    startUnlock()
   }
   return (
     <div className="narrow">
-      <p className="eyebrow">Members' tool</p>
+      <p className="eyebrow">Academy OS members' tool</p>
       <h1>Ask My Adviser</h1>
       <p className="lead">Understand what you pay. Test what you receive. Decide what you need.</p>
       <p>Your adviser may provide valuable expertise, reassurance and practical support. You are entitled to understand the price, the alternatives, the incentives and the limits of the protection you receive. This tool helps you read your own documents and prepare a fair, informed conversation.</p>
-      <form className="card" onSubmit={submit}>
-        <label className="field">
-          <span>Member access code</span>
-          <small>Included with your My Life Record support membership.</small>
-          <input type="password" autoComplete="current-password" value={value} onChange={(e) => setValue(e.target.value)} required />
-        </label>
-        {error && <div className="note bad" role="alert"><p>{error}</p></div>}
-        <button className="btn" disabled={busy || !value.trim()}>{busy ? 'Checking…' : 'Continue'}</button>
-        <p className="small muted" style={{ marginTop: 14 }}>Not a member yet? Membership is available through <a href="https://myliferecord.app" target="_blank" rel="noreferrer">My Life Record</a>.</p>
-      </form>
+      <div className="card">
+        <h3>Sign in with your My Life Record membership</h3>
+        <p className="small muted">You'll go to My Life Record to confirm your membership, then come straight back. If you're already signed in there, it takes a moment. Ask My Adviser never sees your Google account or your My Life Record.</p>
+        {message && <div className="note warn" role="alert"><p>{message}</p></div>}
+        <button className="btn" onClick={go} disabled={going}>{going ? 'Opening My Life Record…' : 'Continue with My Life Record'}</button>
+        <p className="small muted" style={{ marginTop: 14 }}>Not a member yet? Academy OS membership is available through <a href={myLifeUrl} target="_blank" rel="noreferrer">My Life Record</a>, or with a code from your planner.</p>
+      </div>
       <p className="pullquote">Expertise should stand up to questions. A good relationship makes room for them.</p>
     </div>
   )

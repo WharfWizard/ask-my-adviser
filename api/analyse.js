@@ -1,5 +1,5 @@
 import { buildRequest, extractToolResult, InputError } from '../lib/server/prompts.js'
-import { isMember, membershipConfigured, withinDailyLimit } from '../lib/server/membership.js'
+import { checkPass, readPass, withinDailyLimit } from '../lib/server/membership.js'
 
 const MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-5-5'
 const MAX_TOKENS = { inventory: 3000, topic: 8000, agenda: 4000, followup: 5000 }
@@ -11,13 +11,12 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'The analysis service has not been set up yet.' })
-  if (!membershipConfigured()) return res.status(503).json({ error: 'Membership checking has not been set up yet.' })
 
-  const code = req.headers['x-member-code']
-  if (!(await isMember(code))) {
-    return res.status(401).json({ error: 'Please sign in with your member access code.', code: 'not_member' })
+  const pass = await checkPass(readPass(req))
+  if (!pass.ok) {
+    return res.status(401).json({ error: 'Please sign in again through My Life Record.', code: pass.reason })
   }
-  if (!withinDailyLimit(code)) {
+  if (!withinDailyLimit(pass.member)) {
     return res.status(429).json({ error: "You've reached today's limit for analyses. Please come back tomorrow." })
   }
 
