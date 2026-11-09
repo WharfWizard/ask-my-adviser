@@ -153,6 +153,26 @@ textarea { min-height: 110px; resize: vertical; line-height: 1.5; }
 .topic .t-sum { font-size: 0.86rem; color: var(--muted); }
 .topic .t-why { font-size: 0.84rem; color: var(--warn); background: var(--warn-soft); border-radius: 6px; padding: 4px 8px; margin-top: 4px; }
 
+/* Targeted Support Check */
+.ts-card { margin-bottom: 8px; }
+.topic.ts { width: 100%; border-color: var(--orange); background: #fffaf4; }
+.topic.ts.selected { border-color: var(--navy); background: var(--sky-soft); }
+.topic.ts .t-num { color: #9a4e00; }
+.ts-qs { margin: 6px 0 0; padding-left: 1.3em; font-size: 0.88rem; color: var(--ink); columns: 2 280px; column-gap: 28px; }
+.ts-qs li { margin-bottom: 2px; break-inside: avoid; }
+.ts-note { margin: 8px 2px 0; }
+.reading a { white-space: normal; }
+.checkpoint { border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; background: #fff; }
+.checkpoint.ok { border-left-color: var(--ok); }
+.checkpoint.warn { border-left-color: var(--orange); }
+.checkpoint.bad { border-left-color: var(--bad); }
+.cp-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--navy); }
+.cp-num { width: 22px; height: 22px; border-radius: 50%; background: var(--navy); color: #fff; font-size: 0.8rem; font-weight: 700; display: inline-grid; place-items: center; flex: none; }
+.checkpoint .src { font-size: 0.84rem; color: var(--muted); }
+.checkpoint blockquote { margin: 6px 0 0; padding: 6px 10px; background: #fafbfc; border-radius: 6px; font-size: 0.9rem; font-style: italic; color: #3c4257; }
+.cp-ask { margin: 8px 0 0; padding: 6px 10px; background: var(--sky-soft); border-radius: 6px; font-size: 0.92rem; }
+@media print { .checkpoint { break-inside: avoid; } .cp-ask { background: #fff; border: 1px solid #ccc; } }
+
 /* Review */
 .review-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
 .finding { border-left: 4px solid var(--line); padding: 8px 0 8px 14px; margin-bottom: 12px; }

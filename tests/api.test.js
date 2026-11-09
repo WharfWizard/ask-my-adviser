@@ -136,7 +136,7 @@ test('every schema meets the structured-output rules', async () => {
     if ('minItems' in node && ![0, 1].includes(node.minItems)) bad.push(`${path}: minItems`)
     for (const [k, v] of Object.entries(node)) if (k !== 'enum') walk(v, `${path}.${k}`)
   }
-  for (const [action, extra] of [['inventory', {}], ['topic', { topicId: 3 }], ['agenda', { findings: [] }], ['followup', { adviserResponse: 'x', agenda: {} }]]) {
+  for (const [action, extra] of [['inventory', {}], ['topic', { topicId: 3 }], ['topic', { topicId: 16 }], ['agenda', { findings: [] }], ['followup', { adviserResponse: 'x', agenda: {} }]]) {
     const res = mockRes()
     await analyse({ method: 'POST', headers: auth(p), body: { action, documents: docs, ...extra } }, res)
     walk(lastRequest.body.output_config.format.schema, action)
@@ -152,4 +152,32 @@ test('reports a truncated or malformed reply clearly', async () => {
   globalThis.fetch = saved
   assert.equal(res.statusCode, 502)
   assert.match(res.body.error, /ran too long/)
+})
+
+test('Targeted Support Check asks all seven questions with its own output shape', async () => {
+  const res = mockRes()
+  await analyse({ method: 'POST', headers: auth(await makePass()), body: { action: 'topic', topicId: 16, documents: docs } }, res)
+  assert.equal(res.statusCode, 200)
+  const b = lastRequest.body
+  const task = b.messages[0].content[1].text
+  for (const q of [
+    'Which characteristics placed me in this group?',
+    'Which circumstances were excluded?',
+    'Who designed the suggestion?',
+    'What commercial interest does the provider have?',
+    'What alternatives were considered?',
+    'What would make this suggestion unsuitable for me?',
+    'What protection and redress apply?',
+  ]) assert.ok(task.includes(q), q)
+  assert.match(task, /not as if it were personal advice/)
+  const props = b.output_config.format.schema.properties
+  assert.ok(props.checkpoints && props.circumstancesToCheck && props.whenToConsiderPersonalAdvice)
+  assert.deepEqual(props.checkpoints.items.properties.status.enum, ['shown', 'partly_shown', 'not_shown'])
+  assert.match(b.system[0].text, /Targeted support \(added 9 November 2026\)/)
+})
+
+test('the document check can suggest the Targeted Support Check', async () => {
+  const res = mockRes()
+  await analyse({ method: 'POST', headers: auth(await makePass()), body: { action: 'inventory', documents: docs } }, res)
+  assert.match(lastRequest.body.messages[0].content[1].text, /16\. Targeted Support Check/)
 })

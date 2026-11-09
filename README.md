@@ -11,6 +11,8 @@ People add their adviser's documents, say what matters to them, choose up to thr
 3. A one-page meeting agenda in their own voice (editable, print or save as PDF)
 4. An assessment of the adviser's reply: answered with evidence, partly answered, or unresolved
 
+There is also a **Targeted Support Check** for people who have received a targeted support suggestion (a ready-made suggestion about pensions or investments designed for a group of consumers with common characteristics). It asks seven questions — which characteristics placed me in this group, which circumstances were excluded, who designed the suggestion, what commercial interest the provider has, what alternatives were considered, what would make it unsuitable for me, and what protection and redress apply — and shows for each what the documents show, with a question to ask the firm. Its reference note draws on FCA PS25/22, the FCA's segment-design guidance, the FCA–Financial Ombudsman joint statement and the FCA's Annual Public Meeting 2026 responses (page 8).
+
 Education and scrutiny only — not financial advice.
 
 ## How privacy works

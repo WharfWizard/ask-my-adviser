@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { TOPICS, MAX_TOPICS, MAX_TOTAL_CHARS, MAX_DOCS, OPENING_LINE, GUIDE_TITLE, GUIDE_DATE } from '../lib/guide.js'
+import { TOPICS, ALL_TOPICS, TARGETED_SUPPORT, MAX_TOPICS, MAX_TOTAL_CHARS, MAX_DOCS, OPENING_LINE, GUIDE_TITLE, GUIDE_DATE } from '../lib/guide.js'
 import { extractFile, guessDate } from './extract.js'
 import { redact, REDACTION_LABELS } from './redact.js'
 import { startUnlock, receivePass, storedPass, myLifeUrl } from './mlr.js'
@@ -17,8 +17,14 @@ const STATUS_LABEL = {
   partly_answered: ['Partly answered', 'warn'],
   unresolved: ['Unresolved', 'bad'],
 }
+const CHECK_STATUS = {
+  shown: ['Shown in your documents', 'ok'],
+  partly_shown: ['Partly shown', 'warn'],
+  not_shown: ['Not shown', 'bad'],
+}
+const topicLabel = (t) => (t.kind === 'targeted' ? 'Targeted Support Check' : t.id <= 10 ? `Question ${t.id}` : `Further question ${t.id}`)
 const DOC_TYPES = [
-  'Suitability report', 'Fact-find and objectives', 'Ongoing review report', 'Client agreement / service schedule',
+  'Targeted support suggestion', 'Suitability report', 'Fact-find and objectives', 'Ongoing review report', 'Client agreement / service schedule',
   'Fee disclosure', 'Annual costs and charges statement', 'Product terms / KID / factsheet', 'Investment statement / transactions',
   'Performance report', 'Risk assessment', 'Email, letter or meeting note', 'Other',
 ]
@@ -142,7 +148,11 @@ export default function App() {
     setReviews((r) => ({ ...r, [id]: { status: 'loading' } }))
     try {
       const data = await call('topic', { topicId: id })
-      const result = { ...data.result, findings: (data.result.findings || []).map((f) => ({ ...f, kind: String(f.kind || '').toLowerCase() })) }
+      const result = {
+        ...data.result,
+        findings: (data.result.findings || []).map((f) => ({ ...f, kind: String(f.kind || '').toLowerCase() })),
+        checkpoints: (data.result.checkpoints || []).map((c) => ({ ...c, status: String(c.status || '').toLowerCase() })),
+      }
       setReviews((r) => ({ ...r, [id]: { status: 'done', result, truncated: data.truncated } }))
     } catch (e) {
       setReviews((r) => ({ ...r, [id]: { status: 'error', error: e.message } }))
@@ -161,8 +171,25 @@ export default function App() {
 
   function findingsForAgenda() {
     return selected.filter((id) => reviews[id]?.status === 'done').map((id) => {
-      const t = TOPICS.find((x) => x.id === id)
+      const t = ALL_TOPICS.find((x) => x.id === id)
       const r = reviews[id].result
+      if (t.kind === 'targeted') {
+        return {
+          topic: t.title,
+          explanation: r.explanation,
+          suggestion: r.suggestionSummary,
+          keyFindings: (r.checkpoints || []).map((c) => ({
+            finding: `${c.question} ${c.whatTheDocumentsShow}`,
+            kind: c.status,
+            source: [c.filename, c.documentDate, c.location].filter((x) => x && x !== 'none' && x !== 'not stated').join(', '),
+          })),
+          circumstancesToCheck: r.circumstancesToCheck,
+          strongestCaseForService: r.strongestCaseForSuggestion,
+          gaps: r.gaps,
+          questions: (r.checkpoints || []).map((c) => c.questionToAsk),
+          informationToRequest: r.informationToRequest,
+        }
+      }
       return {
         topic: `${t.id}. ${t.title}`,
         explanation: r.explanation,
@@ -388,6 +415,7 @@ function Begin({ onNext }) {
           <li>Product terms, key information documents and factsheets</li>
           <li>Investment statements, transaction history and performance reports</li>
           <li>Risk assessments, and relevant emails, letters and meeting notes</li>
+          <li>Any targeted support suggestion you have received, and the information that came with it</li>
         </ul>
         <p className="small muted">PDF, Word (.docx) and text files work. Scanned images cannot be read — you can type key details instead.</p>
       </div>
@@ -661,12 +689,31 @@ function Check({ inventory, retry, selected, setSelected, onBack, onNext }) {
 
           <h2>Choose up to {MAX_TOPICS} areas</h2>
           <p className="muted">The guide suggests focusing on the three issues most relevant to you. Suggestions based on your documents are highlighted.</p>
+
+          {(() => {
+            const t = TARGETED_SUPPORT
+            const on = selected.includes(t.id)
+            return (
+              <div className="ts-card">
+                <button className={`topic ts ${on ? 'selected' : ''}`} onClick={() => toggle(t.id)} disabled={!on && selected.length >= MAX_TOPICS} aria-pressed={on}>
+                  <span className="t-num">RECEIVED A TARGETED SUPPORT SUGGESTION?{on ? ' · SELECTED' : ''}</span>
+                  <span className="t-title">{t.title}</span>
+                  <span className="t-sum">{t.summary}</span>
+                  <ol className="ts-qs">{t.questions.map((q) => <li key={q}>{q}</li>)}</ol>
+                  {reasons[t.id] && <span className="t-why">Suggested: {reasons[t.id]}</span>}
+                </button>
+                <p className="small muted ts-note">Targeted support gives ready-made suggestions about pensions and investments to groups of people with common characteristics. It sits between guidance and personal advice. <Reading items={t.reading} /></p>
+              </div>
+            )
+          })()}
+
+          <h3 style={{ marginTop: 22 }}>The guide's fifteen questions</h3>
           <div className="topics">
             {TOPICS.map((t) => {
               const on = selected.includes(t.id)
               return (
                 <button key={t.id} className={`topic ${on ? 'selected' : ''}`} onClick={() => toggle(t.id)} disabled={!on && selected.length >= MAX_TOPICS} aria-pressed={on}>
-                  <span className="t-num">{t.id <= 10 ? `QUESTION ${t.id}` : `FURTHER QUESTION ${t.id}`}{on ? ' · SELECTED' : ''}</span>
+                  <span className="t-num">{topicLabel(t).toUpperCase()}{on ? ' · SELECTED' : ''}</span>
                   <span className="t-title">{t.title}</span>
                   <span className="t-sum">{t.summary}</span>
                   {reasons[t.id] && <span className="t-why">Suggested: {reasons[t.id]}</span>}
@@ -701,19 +748,21 @@ function Reviews({ selected, reviews, retry, onBack, onPrint, onNext }) {
       <p className="lead no-print">Each area is reviewed in turn — allow a minute or two for each. Findings are labelled so you can tell documented facts from claims, calculations and inferences.</p>
 
       {selected.map((id) => {
-        const t = TOPICS.find((x) => x.id === id)
+        const t = ALL_TOPICS.find((x) => x.id === id)
         const r = reviews[id]
         return (
           <section className="card" key={id}>
             <div className="review-head">
               <div>
-                <p className="eyebrow">{t.id <= 10 ? `Question ${t.id}` : `Further question ${t.id}`}</p>
+                <p className="eyebrow">{topicLabel(t)}</p>
                 <h2>{t.title}</h2>
               </div>
             </div>
             {(!r || r.status === 'loading') && <div className="status"><span className="spinner" /> {r ? 'Reviewing your documents…' : 'Waiting…'}</div>}
             {r?.status === 'error' && <ErrorBox error={r.error} retry={() => retry(id)} />}
-            {r?.status === 'done' && <TopicResult result={r.result} truncated={r.truncated} />}
+            {r?.status === 'done' && (t.kind === 'targeted'
+              ? <TargetedResult result={r.result} truncated={r.truncated} reading={t.reading} />
+              : <TopicResult result={r.result} truncated={r.truncated} />)}
           </section>
         )
       })}
@@ -725,6 +774,75 @@ function Reviews({ selected, reviews, retry, onBack, onPrint, onNext }) {
           <button className="btn accent" disabled={!anyDone || busy} onClick={onNext}>Build my meeting agenda</button>
         </span>
       </div>
+    </div>
+  )
+}
+
+function Reading({ items }) {
+  return (
+    <span className="reading">Deeper reading:{' '}
+      {items.map((it, i) => (
+        <React.Fragment key={it.url}>{i > 0 && ' · '}<a href={it.url} target="_blank" rel="noreferrer">{it.label}</a></React.Fragment>
+      ))}
+    </span>
+  )
+}
+
+function TargetedResult({ result, truncated, reading }) {
+  const r = result
+  const list = (items) => (items || []).length ? <ul className="clean">{items.map((g, i) => <li key={i}>{g}</li>)}</ul> : <p className="muted small">None identified.</p>
+  return (
+    <div>
+      {truncated && <div className="note warn small"><p>This check was cut short because it ran long. Try again with fewer documents for a complete answer.</p></div>}
+      <div className="note"><p><strong>The suggestion:</strong> {r.suggestionSummary}</p></div>
+      <Paragraphs text={r.explanation} />
+
+      <h3>Seven questions</h3>
+      {(r.checkpoints || []).map((c, i) => {
+        const [label, tone] = CHECK_STATUS[c.status] || [c.status, '']
+        return (
+          <div className={`checkpoint ${tone}`} key={i}>
+            <div className="cp-head"><span className="cp-num">{i + 1}</span><strong>{c.question}</strong> <span className={`chip ${tone}`}>{label}</span></div>
+            <p className="small" style={{ margin: '6px 0' }}>{c.whatTheDocumentsShow}</p>
+            {c.filename && c.filename !== 'none' && (
+              <div className="src">{[c.filename, c.documentDate, c.location].filter((x) => x && x !== 'not stated').join(' · ')}</div>
+            )}
+            {c.extract && <blockquote>“{c.extract}”</blockquote>}
+            <p className="cp-ask"><strong>Ask:</strong> {c.questionToAsk}</p>
+          </div>
+        )
+      })}
+
+      <details className="section" open>
+        <summary>Your circumstances to check against the group</summary>
+        <div>
+          <p className="small muted">Things in your documents or notes the group may not reflect. These are points to raise, not conclusions that the suggestion is unsuitable.</p>
+          {list(r.circumstancesToCheck)}
+        </div>
+      </details>
+
+      <details className="section">
+        <summary>The strongest case for the suggestion — and its limits</summary>
+        <div className="grid-2">
+          <div><h3>Strongest fair case</h3><Paragraphs text={r.strongestCaseForSuggestion} /></div>
+          <div><h3>Limitations</h3><Paragraphs text={r.limitations} /></div>
+        </div>
+      </details>
+
+      <details className="section">
+        <summary>When personal advice may be worth considering</summary>
+        <div>{list(r.whenToConsiderPersonalAdvice)}</div>
+      </details>
+
+      <details className="section">
+        <summary>Gaps and information to request</summary>
+        <div className="grid-2">
+          <div><h3>Gaps and uncertainties</h3>{list(r.gaps)}</div>
+          <div><h3>Ask for before deciding</h3>{list(r.informationToRequest)}</div>
+        </div>
+      </details>
+
+      <p className="small muted" style={{ marginTop: 12 }}>Targeted support is judged by its own rules, not as if it were personal advice. Missing information in your documents does not mean the firm did not consider it. <Reading items={reading} /></p>
     </div>
   )
 }
